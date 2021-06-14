@@ -1,51 +1,84 @@
 import Head from 'next/head'
 import io from 'socket.io-client'
+import { useEffect, useState } from 'react'
+import { of, fromEvent } from 'rxjs'
+import { map, switchMap } from 'rxjs/operators'
+import { getUsername } from '../utils/user'
+import { emitOnConnect, listenOnConnect } from '../lib/socketLib'
 
-
+// https://steveholgado.com/rxjs-chat-app/
 export default function Home() {
-  const socket = io('ws://localhost:4000', {
-    transports: ['websocket'],
-  })
+  const [socket, setSocket] = useState(null)
+  const [users, setUsers] = useState({})
+  const clearUsers = () => {
+    setUsers({})
+  }
+  const addUser = (id, username) => {
+    setUsers(users => ({...users, [id]: username}))
+  }
+  const removeUser = (id) => {
+    setUsers(users => {
+      return Object.keys(users).reduce((result, key) => {
+          if (key !== id) {
+              result[key] = users[key];
+          }
+          return result;
+      }, {})
+    })
+  }
+  
+  useEffect(() => {
+    const socket = io('ws://localhost:4000', {
+      transports: ['websocket'],
+    })
+    const socket$ = of(socket)
+    setSocket(socket$)
+  }, [])
 
-  socket.on('connect', () => {
-    console.log('id:', socket.id);
+  useEffect(() => {
+    console.log('useEffect users:', users)
+    if (socket) {
+      const connect$ = socket
+        .pipe(
+          switchMap(socket =>
+            fromEvent(socket, 'connect')
+              .pipe(
+                map(() => socket)
+              )
+          )
+        )
 
-    // message
-    socket.send('Hello!');
+      listenOnConnect(connect$, 'all_users')
+        .subscribe((users) => {
+          console.log('all_users', users)
+          clearUsers()
+          users.map(({ id, username }) => addUser(id, username))
+        })
 
-    // event, and args
-    socket.emit('loop_events', 5);
-  });
+      const username$ = of(getUsername())
+      emitOnConnect(connect$, username$)
+        .subscribe(({ socket, data }) => {
+          const username = data
+          console.log('save_username', username)
+          socket.emit('save_username', username)
+        })
 
-  socket.on('connect_error', (error) => {
-    console.log('connect_error:', error);
-  });
+      listenOnConnect(connect$, 'new_user_join')
+        .subscribe(({ id, username }) => {
+          console.log('new_user_join', { id, username })
+          console.log('users:', users)
+          addUser(id, username)
+        })
 
-  socket.on('connect_timeout', (timeout) => {
-    console.log('connect_timeout:', timeout);
-  });
-
-  socket.on('reconnect', (attemptNumber) => {
-    console.log('reconnect:', attemptNumber);
-  });
-
-  socket.on('message', data => {
-    console.log(data);
-  });
-
-  socket.on('loop', data => {
-    console.log(data);
-  });
-
-  socket.on('disconnect', (reason) => {
-    if (reason === 'io server disconnect') {
-      // the disconnection was initiated by the server, you need to reconnect manually
-      console.log('io server disconnect:', '==>', 'reconnect manually');
-      socket.connect();
+      listenOnConnect(connect$, 'remove_user')
+        .subscribe(id => {
+          removeUser(id)
+        })
     }
-    // else the socket will automatically try to reconnect
-  });
+  }, [socket, addUser])
 
+
+  console.log('users:', users)
   return (
     <div className="container">
       <Head>
@@ -56,15 +89,22 @@ export default function Home() {
       <main>
         <h1 className="title">RxJS with Socket io</h1>
         <div>
-          <h3>Total Client Number</h3>
+          <h3>Total User Number</h3>
           <div>
-            <p>.....</p>
+            <p>{Object.keys(users).length}</p>
           </div>
         </div>
         <div>
-          <h3>Join Client</h3>
+          <h3>Join User</h3>
           <div>
-            <p>.....</p>
+            {
+              Object.keys(users).map(id => (
+                <div key={id}>
+                  <p>{`id: ${id}`}</p>
+                  <p>{`username: ${users[id]}`}</p>
+                </div>
+              ))
+            }
           </div>
         </div>
         <div>

@@ -42,28 +42,35 @@ const listenOnConnect = (event) => {
     )
 }
 
-connection$.subscribe(({ client }) => {
+connection$.subscribe(({ io, client }) => {
   console.log('connected: ', client.id)
+
+  const allSockets = io.sockets.sockets
+  const allUsers = Object.entries(allSockets)
+      .map(([ id, socket ]) => ({ id, username: socket.username }))
+      .filter(({ username }) => username)
+  console.log('allUsers: ', allUsers)
+  client.emit('all_users', allUsers)
 })
 
 disconnect$.subscribe(client => {
   console.log('disconnected: ', client.id)
+  client.broadcast.emit('remove_user', client.id)
 })
 
-// receive 'message'
-listenOnConnect('message')
+// listen 'save_username' event
+listenOnConnect('save_username')
   .subscribe(({ io, client, data }) => {
     console.log('==============')
-    console.log('[message] from ', client.id)
+    console.log('[save_username] from ', client.id)
     console.log('data:', data)
-
-    if (data === 'loop_events') {
-      zip(
-      from([1,2,3,4,5]),
-        timer(0, 1000),
-        (val, i) => val // Just emit the value
-      ).subscribe(val => client.emit('loop', val))
-    }
+    
+    const allSockets = io.sockets.sockets
+    const id = client.id
+    const username = data
+    allSockets[id].username = username
+    console.log('[new_user_join] from ', client.id)
+    client.broadcast.emit('new_user_join', { id, username })
     console.log('==============')
   })
 
