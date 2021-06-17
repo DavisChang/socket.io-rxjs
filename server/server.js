@@ -43,45 +43,31 @@ const listenOnConnect = (event) => {
 }
 
 connection$.subscribe(({ io, client }) => {
-  console.log('connected: ', client.id)
-
   const allSockets = io.sockets.sockets
   const allUsers = Object.entries(allSockets)
       .map(([ id, socket ]) => ({ id, username: socket.username }))
       .filter(({ username }) => username)
-  console.log('allUsers: ', allUsers)
   client.emit('all_users', allUsers)
 })
 
 disconnect$.subscribe(client => {
-  console.log('disconnected: ', client.id)
   client.broadcast.emit('remove_user', client.id)
 })
 
 // listen 'save_username' event
 listenOnConnect('save_username')
   .subscribe(({ io, client, data }) => {
-    console.log('==============')
-    console.log('[save_username] from ', client.id)
-    console.log('data:', data)
-    
     const allSockets = io.sockets.sockets
     const id = client.id
     const username = data
     allSockets[id].username = username
-    console.log('[new_user_join] from ', client.id)
     client.broadcast.emit('new_user_join', { id, username })
-    console.log('==============')
   })
 
 // receive event 'loop_events'
 const loop_events = 'loop_events'
 listenOnConnect(loop_events)
   .subscribe(({ io, client, data }) => {
-    console.log('==============')
-    console.log(`[${loop_events}] from ${client.id}`)
-    console.log('data:', data)
-
     if (typeof data === 'number') {
       zip(
       from(Array.from(Array(data).keys())),
@@ -89,8 +75,26 @@ listenOnConnect(loop_events)
         (val, i) => val
       ).subscribe(val => client.emit('loop', val))
     }
-    console.log('==============')
   })
+
+  // receive event 'chat_message'
+const chat_message = 'chat_message'
+listenOnConnect(chat_message)
+  .subscribe(({ io, client, data }) => {
+    const from = client.username
+    const { id, msg } = data
+
+    if (!id) return
+
+    if (id === 'everyone') {
+      // Send to everyone
+      client.broadcast.emit('chat_message', { from, msg, id })
+    } else {
+      // Send only to recipient
+      client.broadcast.to(id).emit('chat_message', { from, msg, id })
+    }
+  })
+
 
 server.listen(4000, () => {
   console.log('listening on *:4000');
