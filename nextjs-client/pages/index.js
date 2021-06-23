@@ -90,7 +90,7 @@ export default function Home() {
     setMsg('')
   }
   const addMessage = (uid, message, isMine=0) => {
-    setMsgs(list => ([...list, {id: uid, text: message, t: new Date(), isMine}]))
+    setMsgs(list => ([...list, {id: uid, text: message, t: Date.now(), isMine}]))
   }
   const onClickSubmit = () => {
     const sendMessage$ = of(msg)

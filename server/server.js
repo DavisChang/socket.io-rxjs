@@ -47,6 +47,7 @@ connection$.subscribe(({ io, client }) => {
   const allUsers = Object.entries(allSockets)
       .map(([ id, socket ]) => ({ id, username: socket.username }))
       .filter(({ username }) => username)
+  console.log('=== allUsers ===')
   client.emit('all_users', allUsers)
 })
 
@@ -60,6 +61,7 @@ listenOnConnect('save_username')
     const allSockets = io.sockets.sockets
     const id = client.id
     const username = data
+    console.log('=== start ===')
     allSockets[id].username = username
     client.broadcast.emit('new_user_join', { id, username })
   })
@@ -83,6 +85,7 @@ listenOnConnect(chat_message)
   .subscribe(({ io, client, data }) => {
     const from = client.username
     const { id, msg } = data
+    console.log('=== chat_message ===')
 
     if (!id) return
 

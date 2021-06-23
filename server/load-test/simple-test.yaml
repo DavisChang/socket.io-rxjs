@@ -1,0 +1,34 @@
+config:
+  target: "ws://localhost:4000"
+  socketio:
+    transports: ["websocket"]
+  ensure:
+    maxErrorRate: 1 # fail if error rate exceeds 1%
+    max: 500 # fail if max response time exceeds 500ms
+  processor: "./custom.js" # set a processor for dynamic variables
+  phases:
+    # basic
+    - duration: 10 # Run scenario for 10 seconds
+      arrivalCount: 30 # Create 20 virtual users per scenario
+    # advanced
+    # - duration: 20
+    #   arrivalRate: 10
+    #   rampTo: 50
+    #   name: "Warm up phase"
+    # - duration: 60
+    #   arrivalRate: 50
+    #   name: "Sustained max load"
+scenarios:
+  - engine: "socketio"
+    flow:
+      - function: "getChatData" # load variables
+      - emit:
+          channel: "save_username"
+          data: "{{ name }}"
+      - emit:
+          channel: "chat_message"
+          data: {
+            id: "rUkP26L2EQMtCt18AABA",
+            msg: "msg - {{ greeting }}"
+          }
+      - think: 5 # do nothing for 5 seconds, then disconnect
